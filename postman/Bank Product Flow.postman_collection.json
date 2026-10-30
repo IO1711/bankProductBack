@@ -1,0 +1,418 @@
+{
+  "info": {
+    "name": "Bank Product Flow (demo API)",
+    "description": "Use Authentication: get CSRF, issue a one-time demo host ticket, exchange it for a session, then run the API requests. Postman retains the session cookie. For signed actions run Prepare, Demo E-IMZO sign, Run.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "requestId",
+      "value": "1"
+    },
+    {
+      "key": "documentId",
+      "value": "1"
+    },
+    {
+      "key": "action",
+      "value": "submit_passport"
+    },
+    {
+      "key": "prepareBody",
+      "value": "{\"review_task_id\":1}"
+    },
+    {
+      "key": "signSessionId",
+      "value": ""
+    },
+    {
+      "key": "demoPkcs7",
+      "value": ""
+    },
+    {
+      "key": "code",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": "u-creator"
+    },
+    {
+      "key": "csrfToken",
+      "value": ""
+    },
+    {
+      "key": "ticket",
+      "value": ""
+    }
+  ],
+  "auth": {
+    "type": "noauth"
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "if ([\"POST\", \"PUT\", \"PATCH\", \"DELETE\"].includes(pm.request.method)) {",
+          "  pm.request.headers.upsert({ key: \"X-CSRF-TOKEN\", value: pm.collectionVariables.get(\"csrfToken\") || \"\" });",
+          "}"
+        ]
+      }
+    }
+  ],
+  "item": [
+    {
+      "name": "Authentication",
+      "description": "Run Get CSRF, Issue demo host ticket, Exchange ticket for session. Postman keeps JSESSIONID. To switch user, issue a new ticket and exchange it. After logout, get a new CSRF token.",
+      "item": [
+        {
+          "name": "Get CSRF token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) pm.collectionVariables.set(\"csrfToken\", pm.response.json().token);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/auth/csrf"
+          }
+        },
+        {
+          "name": "Issue demo host ticket",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) pm.collectionVariables.set(\"ticket\", pm.response.json().ticket);"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"user_id\":\"{{userId}}\"}"
+            },
+            "url": "{{baseUrl}}/api/demo/host/tickets"
+          }
+        },
+        {
+          "name": "Exchange ticket for session",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"ticket\":\"{{ticket}}\"}"
+            },
+            "url": "{{baseUrl}}/api/auth/sso"
+          }
+        },
+        {
+          "name": "Logout",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/api/auth/logout"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Demo organization",
+      "item": [
+        {
+          "name": "All demo users",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/api/demo/users"
+          }
+        },
+        {
+          "name": "Current user",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/me"
+          }
+        },
+        {
+          "name": "Departments",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/departments"
+          }
+        },
+        {
+          "name": "Department employees",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/departments/D-12/employees"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Requests",
+      "item": [
+        {
+          "name": "Create loan request",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) pm.collectionVariables.set('requestId', pm.response.json().id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"type\":\"loan\"}"
+            },
+            "url": "{{baseUrl}}/api/requests"
+          }
+        },
+        {
+          "name": "My requests",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/requests?scope=mine"
+          }
+        },
+        {
+          "name": "Inbox",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/requests?scope=inbox"
+          }
+        },
+        {
+          "name": "Request detail",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/requests/{{requestId}}"
+          }
+        },
+        {
+          "name": "Notification count",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/notifications/summary"
+          }
+        },
+        {
+          "name": "Final ZIP",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/requests/{{requestId}}/package"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Documents",
+      "item": [
+        {
+          "name": "Upload DOC or DOCX (edit kind and choose file)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 201) pm.collectionVariables.set('documentId', pm.response.json().document_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "kind",
+                  "value": "passport",
+                  "type": "text"
+                },
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": ""
+                }
+              ]
+            },
+            "url": "{{baseUrl}}/api/requests/{{requestId}}/documents"
+          }
+        },
+        {
+          "name": "Download latest signed PDF",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/documents/{{documentId}}/download"
+          }
+        },
+        {
+          "name": "Download original DOC/DOCX",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/documents/{{documentId}}/download?original=true"
+          }
+        },
+        {
+          "name": "Delete own unsigned document",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/api/documents/{{documentId}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Actions",
+      "description": "Set action and ensure the right user is logged in. For signed actions run Prepare, Demo E-IMZO sign, then Run.",
+      "item": [
+        {
+          "name": "Prepare demo signature",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) pm.collectionVariables.set('signSessionId', pm.response.json().sign_session_id);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{{prepareBody}}"
+            },
+            "url": "{{baseUrl}}/api/requests/{{requestId}}/actions/{{action}}/prepare"
+          }
+        },
+        {
+          "name": "Demo E-IMZO sign",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) pm.collectionVariables.set('demoPkcs7', pm.response.json().pkcs7);"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"sign_session_id\":\"{{signSessionId}}\"}"
+            },
+            "url": "{{baseUrl}}/api/demo/eimzo/sign"
+          }
+        },
+        {
+          "name": "Run action (edit parameters)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\"sign_session_id\":\"{{signSessionId}}\",\"pkcs7\":\"{{demoPkcs7}}\",\"reason\":\"Needs correction\",\"department_ids\":[\"D-12\",\"D-15\"],\"user_id\":\"u-risk\",\"conclusion\":\"positive\",\"review_task_id\":1,\"executor_department_id\":\"D-20\"}"
+            },
+            "url": "{{baseUrl}}/api/requests/{{requestId}}/actions/{{action}}"
+          }
+        }
+      ]
+    },
+    {
+      "name": "Verification and audit",
+      "item": [
+        {
+          "name": "Verify QR code",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/verify/{{code}}"
+          }
+        },
+        {
+          "name": "Audit log (chairman)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/api/audit"
+          }
+        }
+      ]
+    }
+  ]
+}
